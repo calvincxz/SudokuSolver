@@ -97,30 +97,30 @@ class Sudoku(object):
     # Returns the next variable to be assigned a value will be the variable which 
     # is involved in the most number of constraints with other unassigned variables.
     def get_most_constraining_square(self):
-    	max_size = -1
+        max_size = -1
 
-    	result = None
-    	for i in range(9):
-    		for j in range(9):
-    			if puzzle[i][j] != 0:
-    				continue
+        result = None
+        for i in range(9):
+            for j in range(9):
+                if puzzle[i][j] != 0:
+                    continue
 
-    			count = 0
-    			indices = self.get_list_of_indices(i, j)
-    			for index in indices:
-    				if puzzle[index//9][index%9] == 0:
-    					count+=1
+                count = 0
+                indices = self.get_list_of_indices(i, j)
+                for index in indices:
+                    if puzzle[index//9][index%9] == 0:
+                        count+=1
 
-    			if count > max_size:
-    				max_size = count
-    				result = i, j
-    	return result
+                if count > max_size:
+                    max_size = count
+                    result = i, j
+        return result
 
 
     def solve_backtrack(self):    
         # MRV heuristic
-        #selected_square = self.get_most_constrained_square()
-        selected_square = self.get_most_constraining_square()
+        selected_square = self.get_most_constrained_square()
+        #selected_square = self.get_most_constraining_square()
         #print(selected_square)
         if selected_square == None: 
             return True
@@ -137,11 +137,10 @@ class Sudoku(object):
             # select the least constraining value 
             value = self.get_least_constraining_value(values, indices)
             values.discard(value)
-            
+
             # forward check for null domains    
             #if self.forward_check(value,indices): #Switch comment to disable/enable ac3
-            if True:
-
+            if self.is_consistent_assignment(value, indices):
                 puzzle[row][col] = value
                 temp = copy.deepcopy(self.domain)
                 self.domain = self.remove_values(row, col, value, self.domain)
@@ -150,12 +149,12 @@ class Sudoku(object):
                 if self.AC3(): #Change to true to disable ac3
                 #if True:
 
-	                if self.solve_backtrack():
-	                    return True
-	                else:
-	                    puzzle[row][col] = 0
-	                    self.domain = temp
-                    
+                    if self.solve_backtrack():
+                        return True
+        
+            puzzle[row][col] = 0
+            self.domain = temp
+                
         return False
 
     # check cells in same row, col and block, returns the value which affects the least cells
@@ -187,68 +186,83 @@ class Sudoku(object):
                                                  
         return True
 
+    # Check assignment consistency
+    def is_consistent_assignment(self, value, indices):
+        for index in indices:
+            if puzzle[index//9][index%9] == value:
+                return False
+        return True
+
     # Initialize all arcs in constraint graph 
     def init_arcs(self):
-    	arcs = list()
-    	for i in range(81):
-    		for j in range(81):
-    			ipos = (i//9, i%9)
-    			jpos = (j//9, j%9)
+        arcs = list()
+        for i in range(81):
+            for j in range(81):
+                ipos = (i//9, i%9)
+                jpos = (j//9, j%9)
 
-    			if ipos == jpos:
-    				continue
+                if ipos == jpos:
+                    continue
+                if ipos[0] == jpos[0]:
+                    arcs.append((i,j))
+                    continue
+                if ipos[1] == jpos[1]:
+                    arcs.append((i,j))
+                    continue
 
-    			if ipos[0] == jpos[0]:
-    				arcs.append((i,j))
-    				continue
-    			if ipos[1] == jpos[1]:
-    				arcs.append((i,j))
-    				continue
-
-    			if (ipos[0]//3 == jpos[0]//3) and (ipos[1]//3 == jpos[1]//3):
-    				arcs.append((i,j))
-    	return arcs
+                if (ipos[0]//3 == jpos[0]//3) and (ipos[1]//3 == jpos[1]//3):
+                    arcs.append((i,j))
+        return arcs
 
 
     # AC3 Inference Mechanism
     # Returns false if inconsistency is found and true otherwise
     def AC3(self):
-    	# Initialize queue of all arcs
-    	queue = deque(self.arcs)
+        # Initialize queue of all arcs
+        queue = deque(self.arcs)
 
-    	while queue:
-    		edge = queue.popleft()
-    		#print(edge)
-    		if self.revise(edge):
-    			if len(self.domain[edge[0]]) == 0:
-    				return False
+        while queue:
+            edge = queue.popleft()
+            #print(edge)
+            if self.revise(edge):
+                if len(self.domain[edge[0]]) == 0:
+                    #print("AC3 fail")
+                    return False
 
-    				for k in get_list_of_indices(edge[0]//9, edge[0]%9):
-    					if k == edge[1]:
-    						continue
-    					queue.append((k,edge[0]))
+                    for k in get_list_of_indices(edge[0]//9, edge[0]%9):
+                        if k == edge[1]:
+                            continue
+                        queue.append((k,edge[0]))
 
-    	return True
+        return True
 
     # Revise Edge
     # Returns true if param domain is revised
     def revise(self, edge):
-    	revised = False
-    	temp = set(self.domain[edge[0]])
-    	#print("Parent " + str(edge[0])+" : " + str(self.domain[edge[0]]) + " Child : " + str(self.domain[edge[1]]))
-    	for x in self.domain[edge[0]]:
-    		hasSatisfyingChildValue = False
-    		for y in self.domain[edge[1]]:
-    			if x != y: # if there is at least 1 satisfiable value in Xj
-    				hasSatisfyingChildValue = True
-    				break
-    		if hasSatisfyingChildValue:
-    			break
-    		temp.discard(x)
-    		revised = True
-    	if revised:
-    		self.domain[edge[0]] = temp
-    	return revised
+        revised = False
+        temp = set(self.domain[edge[0]])
+        #print("Parent " + str(edge[0])+" : " + str(self.domain[edge[0]]) + " Child " + str(edge[1])+" : " + str(self.domain[edge[1]]))
+        for x in self.domain[edge[0]]:
+            hasSatisfyingChildValue = False
+            for y in self.domain[edge[1]]:
+                if x != y: # if there is at least 1 satisfiable value in Xj
+                    hasSatisfyingChildValue = True
+                    break
+            if hasSatisfyingChildValue:
+                continue
+    
+            #print("Parent " + str(edge[0])+" : " + str(self.domain[edge[0]]) + " Child " + str(edge[1])+" : " + str(self.domain[edge[1]]))
+            #print("Removed : "+str(x))
+            temp.remove(x)
+            revised = True
+        if revised:
+            self.domain[edge[0]] = temp
+            #print("Parent " + str(edge[0])+" : " + str(self.domain[edge[0]]) + " Child " + str(edge[1])+" : " + str(self.domain[edge[1]]), end="\n\n")
+
+
+        #print("Parent " + str(edge[0])+" : " + str(self.domain[edge[0]]) + " Child " + str(edge[1])+" : " + str(self.domain[edge[1]]), end="\n\n")
+
+        return revised
     
     def solve(self):
         start = time.time()

@@ -42,13 +42,12 @@ class Sudoku(object):
                 indices.append(col + 9 * i)
 
         block_row = math.floor(row / 3)
-        block_col = math.floor(col / 3)  
+        block_col = math.floor(col / 3)
         for i in range(3):
             for j in range(3):
                 index = int((block_row * 3 + i) * 9 + block_col * 3 + j)
-                if index != row * 9 + col:
+                if (index != row * 9 + col) and (index//9 != row) and (index%9 != col):
                     indices.append(index)
-
         return indices   
 
     # Removes the specified value from constrained squares and returns the new dictionary
@@ -94,15 +93,40 @@ class Sudoku(object):
 
         return result
 
+    # Degree Heuristic
+    # Returns the next variable to be assigned a value will be the variable which 
+    # is involved in the most number of constraints with other unassigned variables.
+    def get_most_constraining_square(self):
+    	max_size = -1
+
+    	result = None
+    	for i in range(9):
+    		for j in range(9):
+    			if puzzle[i][j] != 0:
+    				continue
+
+    			count = 0
+    			indices = self.get_list_of_indices(i, j)
+    			for index in indices:
+    				if puzzle[index//9][index%9] == 0:
+    					count+=1
+
+    			if count > max_size:
+    				max_size = count
+    				result = i, j
+    	return result
+
+
     def solve_backtrack(self):    
         # MRV heuristic
-        most_constrainted_square = self.get_most_constrained_square()
-
-        if most_constrainted_square == None: 
+        #selected_square = self.get_most_constrained_square()
+        selected_square = self.get_most_constraining_square()
+        #print(selected_square)
+        if selected_square == None: 
             return True
         
-        row = most_constrainted_square[0]
-        col = most_constrainted_square[1]
+        row = selected_square[0]
+        col = selected_square[1]
         values = self.domain[row * 9 + col]
         indices = self.get_list_of_indices(row, col)
         

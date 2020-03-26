@@ -2,6 +2,9 @@ import sys
 import copy
 import math
 import time
+import itertools
+from collections import deque
+
 # Running script: given code can be run with the command:
 # python file.py, ./path/to/init_state.txt ./output/output.txt
 
@@ -12,6 +15,7 @@ class Sudoku(object):
         self.ans = copy.deepcopy(puzzle) # self.ans is a list of lists
         self.domain = self.init_domain() # only called once during initialization
         self.nodes = 0
+        self.arcs = self.init_arcs()
 
     def init_domain(self):
         domain = {}
@@ -111,17 +115,22 @@ class Sudoku(object):
             values.discard(value)
             
             # forward check for null domains    
-            if self.forward_check(value, indices):
+            #if self.forward_check(value,indices): #Switch comment to disable/enable ac3
+            if True:
+
                 puzzle[row][col] = value
                 temp = copy.deepcopy(self.domain)
                 self.domain = self.remove_values(row, col, value, self.domain)
                 self.nodes += 1
 
-                if self.solve_backtrack():
-                    return True
-                else:
-                    puzzle[row][col] = 0
-                    self.domain = temp
+                if self.AC3(): #Change to true to disable ac3
+                #if True:
+
+	                if self.solve_backtrack():
+	                    return True
+	                else:
+	                    puzzle[row][col] = 0
+	                    self.domain = temp
                     
         return False
 
@@ -130,14 +139,16 @@ class Sudoku(object):
     def get_least_constraining_value(self, values, indices):
         result = None
         min_constraints = 1000
+        #min_constraints = -1
         for value in values:
             num_of_constraints = 0
             for index in indices:
-                if value in self.domain[index]:
+                if value in self.domain[index]: # TODO: Check if this is doing the opposite (unexpected result of being faster/slower)
                     num_of_constraints += 1
 
             # update min
             if min_constraints > num_of_constraints:
+            #if min_constraints < num_of_constraints:
                 min_constraints = num_of_constraints
                 result = value
 
@@ -151,6 +162,69 @@ class Sudoku(object):
                 return False
                                                  
         return True
+
+    # Initialize all arcs in constraint graph 
+    def init_arcs(self):
+    	arcs = list()
+    	for i in range(81):
+    		for j in range(81):
+    			ipos = (i//9, i%9)
+    			jpos = (j//9, j%9)
+
+    			if ipos == jpos:
+    				continue
+
+    			if ipos[0] == jpos[0]:
+    				arcs.append((i,j))
+    				continue
+    			if ipos[1] == jpos[1]:
+    				arcs.append((i,j))
+    				continue
+
+    			if (ipos[0]//3 == jpos[0]//3) and (ipos[1]//3 == jpos[1]//3):
+    				arcs.append((i,j))
+    	return arcs
+
+
+    # AC3 Inference Mechanism
+    # Returns false if inconsistency is found and true otherwise
+    def AC3(self):
+    	# Initialize queue of all arcs
+    	queue = deque(self.arcs)
+
+    	while queue:
+    		edge = queue.popleft()
+    		#print(edge)
+    		if self.revise(edge):
+    			if len(self.domain[edge[0]]) == 0:
+    				return False
+
+    				for k in get_list_of_indices(edge[0]//9, edge[0]%9):
+    					if k == edge[1]:
+    						continue
+    					queue.append((k,edge[0]))
+
+    	return True
+
+    # Revise Edge
+    # Returns true if param domain is revised
+    def revise(self, edge):
+    	revised = False
+    	temp = set(self.domain[edge[0]])
+    	#print("Parent " + str(edge[0])+" : " + str(self.domain[edge[0]]) + " Child : " + str(self.domain[edge[1]]))
+    	for x in self.domain[edge[0]]:
+    		hasSatisfyingChildValue = False
+    		for y in self.domain[edge[1]]:
+    			if x != y: # if there is at least 1 satisfiable value in Xj
+    				hasSatisfyingChildValue = True
+    				break
+    		if hasSatisfyingChildValue:
+    			break
+    		temp.discard(x)
+    		revised = True
+    	if revised:
+    		self.domain[edge[0]] = temp
+    	return revised
     
     def solve(self):
         start = time.time()

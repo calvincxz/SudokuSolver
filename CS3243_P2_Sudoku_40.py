@@ -12,7 +12,6 @@ class Sudoku(object):
     def __init__(self, puzzle):
         # you may add more attributes if you need
         self.puzzle = puzzle # self.puzzle is a list of lists
-        self.ans = copy.deepcopy(puzzle) # self.ans is a list of lists
         self.domain = self.init_domain() # only called once during initialization
         self.nodes = 0
         self.arcs = self.init_arcs()
@@ -52,21 +51,12 @@ class Sudoku(object):
 
     # Removes the specified value from constrained squares and returns the new dictionary
     def remove_values(self, row, col, value, remaining_values):
-        remaining_values[row * 9 + col] = { value }
+        remaining_values[row * 9 + col] = set([value])
 
         for index in self.get_list_of_indices(row, col):
             remaining_values[index].discard(value)
 
         return remaining_values
-
-    # return the list of empty squares
-    def get_empty_squares(self):
-        empty_squares = []
-        for row in range(9):
-            for col in range(9):
-                if puzzle[row][col] == 0:
-                    empty_squares.append([row, col]) 
-        return empty_squares
 
     # returns the row, col of the most contrained empty square (MRV heuristic)
     # returns None if all squares are filled
@@ -127,7 +117,7 @@ class Sudoku(object):
         
         row = selected_square[0]
         col = selected_square[1]
-        values = self.domain[row * 9 + col]
+        values = self.domain[row * 9 + col].copy()
         indices = self.get_list_of_indices(row, col)
         
         while len(values) != 0: 
@@ -139,30 +129,34 @@ class Sudoku(object):
             values.discard(value)
 
             # forward check for null domains    
-            #if self.forward_check(value,indices): #Switch comment to disable/enable ac3
-            if self.is_consistent_assignment(value, indices):
+            if self.forward_check(value,indices): #Switch comment to disable/enable ac3
+            #if self.is_consistent_assignment(value, indices):
                 puzzle[row][col] = value
-                temp = copy.deepcopy(self.domain)
-                self.domain = self.remove_values(row, col, value, self.domain)
+                previous_domain = self.domain[row * 9 + col].copy()
+                self.domain[row * 9 + col] = set([value])
+                affected_domain = list()
+                for index in self.get_list_of_indices(row, col):
+                    if value in self.domain[index]:
+                        self.domain[index].remove(value)
+                        affected_domain.append(index)
+
                 self.nodes += 1
 
-                if self.AC3(): #Change to true to disable ac3
-                #if True:
-
+                #if self.AC3(): #Change to true to disable ac3
+                if True:
                     if self.solve_backtrack():
                         return True
-        
-            puzzle[row][col] = 0
-            self.domain = temp
-                
+                    else:
+                        puzzle[row][col] = 0
+                        self.domain[row * 9 + col] = previous_domain
+                        for index in affected_domain:
+                            self.domain[index].add(value)
         return False
 
     # check cells in same row, col and block, returns the value which affects the least cells
-    # UNUSED HEURISTIC
     def get_least_constraining_value(self, values, indices):
         result = None
         min_constraints = 1000
-        #min_constraints = -1
         for value in values:
             num_of_constraints = 0
             for index in indices:
@@ -171,7 +165,6 @@ class Sudoku(object):
 
             # update min
             if min_constraints > num_of_constraints:
-            #if min_constraints < num_of_constraints:
                 min_constraints = num_of_constraints
                 result = value
 

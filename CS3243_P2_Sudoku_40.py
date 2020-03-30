@@ -109,8 +109,8 @@ class Sudoku(object):
 
     def solve_backtrack(self):    
         # MRV heuristic
-        selected_square = self.get_most_constrained_square()
-        #selected_square = self.get_most_constraining_square()
+        #selected_square = self.get_most_constrained_square()
+        selected_square = self.get_most_constraining_square()
         #print(selected_square)
         if selected_square == None: 
             return True
@@ -129,28 +129,33 @@ class Sudoku(object):
             values.discard(value)
 
             # forward check for null domains    
-            if self.forward_check(value,indices): #Switch comment to disable/enable ac3
-            #if self.is_consistent_assignment(value, indices):
+            #if self.forward_check(value,indices): #Switch comment to disable/enable ac3
+            if self.is_consistent_assignment(value, indices):
                 puzzle[row][col] = value
-                previous_domain = self.domain[row * 9 + col].copy()
-                self.domain[row * 9 + col] = set([value])
-                affected_domain = list()
-                for index in self.get_list_of_indices(row, col):
-                    if value in self.domain[index]:
-                        self.domain[index].remove(value)
-                        affected_domain.append(index)
+                #previous_domain = self.domain[row * 9 + col].copy()
+                #self.domain[row * 9 + col] = set([value])
+                #affected_domain = list()
+                tempDomain = copy.deepcopy(self.domain)
+                #for index in self.get_list_of_indices(row, col):
+                #    if value in self.domain[index]:
+                #        self.domain[index].remove(value)
+                #        affected_domain.append(index)
+                self.domain = self.remove_values(row, col, value, self.domain)
+
 
                 self.nodes += 1
 
-                #if self.AC3(): #Change to true to disable ac3
-                if True:
+                if self.AC3(): #Change to true to disable ac3
+                #if True:
                     if self.solve_backtrack():
                         return True
-                    else:
-                        puzzle[row][col] = 0
-                        self.domain[row * 9 + col] = previous_domain
-                        for index in affected_domain:
-                            self.domain[index].add(value)
+                    #else:
+                        #puzzle[row][col] = 0
+                        #self.domain[row * 9 + col] = previous_domain
+                        #for index in affected_domain:
+                        #    self.domain[index].add(value)
+                puzzle[row][col] = 0
+                self.domain = tempDomain
         return False
 
     # check cells in same row, col and block, returns the value which affects the least cells
@@ -225,8 +230,6 @@ class Sudoku(object):
                     for k in get_list_of_indices(edge[0]//9, edge[0]%9):
                         if k == edge[1]:
                             continue
-                        queue.append((k,edge[0]))
-
         return True
 
     # Revise Edge

@@ -120,6 +120,8 @@ class Sudoku(object):
         values = self.domain[row * 9 + col].copy()
         indices = self.get_list_of_indices(row, col)
         
+
+        # Forward Checking
         while len(values) != 0: 
             # select random variable
             # value = values.pop()  
@@ -129,8 +131,7 @@ class Sudoku(object):
             values.discard(value)
 
             # forward check for null domains    
-            if self.forward_check(value,indices): #Switch comment to disable/enable ac3
-            #if self.is_consistent_assignment(value, indices):
+            if self.forward_check(value,indices):
                 puzzle[row][col] = value
                 previous_domain = self.domain[row * 9 + col].copy()
                 self.domain[row * 9 + col] = set([value])
@@ -142,7 +143,6 @@ class Sudoku(object):
 
                 self.nodes += 1
 
-                #if self.AC3(): #Change to true to disable ac3
                 if True:
                     if self.solve_backtrack():
                         return True
@@ -151,6 +151,31 @@ class Sudoku(object):
                         self.domain[row * 9 + col] = previous_domain
                         for index in affected_domain:
                             self.domain[index].add(value)
+
+        # AC3
+        # while len(values) != 0: 
+        #     # select random variable
+        #     # value = values.pop()  
+
+        #     # select the least constraining value 
+        #     value = self.get_least_constraining_value(values, indices)
+        #     values.discard(value)
+
+        #     # Check if assignment is consistent   
+        #     if self.is_consistent_assignment(value, indices):
+        #         puzzle[row][col] = value
+        #         tempDomain = copy.deepcopy(self.domain)
+        #         self.domain = self.remove_values(row, col, value, self.domain)
+
+
+        #         self.nodes += 1
+
+        #         if self.AC3(): #Run AC3
+        #             if self.solve_backtrack():
+        #                 return True
+        #         puzzle[row][col] = 0
+        #         self.domain = tempDomain
+
         return False
 
     # check cells in same row, col and block, returns the value which affects the least cells
@@ -225,8 +250,6 @@ class Sudoku(object):
                     for k in get_list_of_indices(edge[0]//9, edge[0]%9):
                         if k == edge[1]:
                             continue
-                        queue.append((k,edge[0]))
-
         return True
 
     # Revise Edge

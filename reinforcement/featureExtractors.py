@@ -102,13 +102,85 @@ class SimpleExtractor(FeatureExtractor):
         features.divideAll(10.0)
         return features
 
-class NewExtractor(FeatureExtractor):
+class NewExtractor(FeatureExtractor):  
     """
-    Design you own feature extractor here. You may define other helper functions you find necessary.
+    New feature added:
+    - whether the ghosts are dangerous or scared
+    - whether a dangerous ghost collision is imminent
+    - whether a dangerous ghost is one step away
+    - if the ghost is not dangerous, ignore it even if collision will occur
     """
-    def getFeatures(self, state, action):
-        "*** YOUR CODE HERE ***"
-        pass
+    def getScaredGhosts(self, ghostStates):
+        """
+        Returns a list of ghostState for the scared ghosts
+        """
+        return list(filter(lambda ghostState: ghostState.scaredTimer > 0, ghostStates))
+    
+    def getDangerGhosts(self, ghostStates):
+        """
+        Returns a list of ghostState for the dangerous ghosts
+        """
+        return list(filter(lambda ghostState: ghostState.scaredTimer == 0, ghostStates))
 
+    def getFeatures(self, state, action):
+        # extract the grid of food and wall locations and get the ghost locations
+        food = state.getFood()
+        walls = state.getWalls()
+        ghosts = state.getGhostPositions()
+        ghostStates = state.getGhostStates()
+        
+        features = util.Counter()
+
+        features["bias"] = 1.0
+        
+        # compute the location of pacman after he takes the action
+        x, y = state.getPacmanPosition()
+        dx, dy = Actions.directionToVector(action)
+        next_x, next_y = int(x + dx), int(y + dy)
+
+        scaredGhosts = list(filter(lambda dist: dist is not None, map(lambda ghostState: distOfScaredGhost((next_x, next_y), ghostState, walls), self.getScaredGhosts(ghostStates))))
+        
+        if scaredGhosts:
+            closestScaredGhosts = min(scaredGhosts)
+            features["eat-scared-ghost"] = 1.0 - closestScaredGhosts
+
+        # count the number of danger ghosts 1-step away
+        features['#-of-strong-ghost-1-step-away'] = sum(
+            (next_x, next_y) in Actions.getLegalNeighbors(ghostState.getPosition(), walls) for ghostState in self.getDangerGhosts(ghostStates))
+        
+        # if there is no danger of ghosts then add the food feature
+        if not features["#-of-strong-ghosts-1-step-away"] and food[next_x][next_y]:
+            features["eats-food"] = 1.0
+
+        dist = closestFood((next_x, next_y), food, walls)
+        if dist is not None:
+            # make the distance a number less than one otherwise the update
+            # will diverge wildly
+            features["closest-food"] = float(dist) / (walls.width * walls.height)
+        features.divideAll(10.0)
+        return features
+
+def distOfScaredGhost(pos, ghostState, walls):
+        x,y = ghostState.getPosition()
+        dx, dy = Actions.directionToVector(ghostState.getDirection())
+        ghost = (int(x + dx), int(y + dy))
+        fringe = [(pos[0], pos[1], 0)]
+        expanded = set()
+        while fringe:
+            pos_x, pos_y, dist = fringe.pop(0)
+            if (pos_x, pos_y) in expanded:
+                continue
+            expanded.add((pos_x, pos_y))
+            # if we find a scared ghost at this location then exit
+            if ghost == (pos_x, pos_y):
+                return float(dist) / (walls.width * walls.height)
+            # otherwise spread out from the location to its neighbours
+            nbrs = Actions.getLegalNeighbors((pos_x, pos_y), walls)
+            for nbr_x, nbr_y in nbrs:
+                fringe.append((nbr_x, nbr_y, dist+1))
+        # no food found
+        return None
+
+    
 
         
